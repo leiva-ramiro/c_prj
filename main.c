@@ -15,8 +15,8 @@ typedef enum{
 // --------------------------
 
 void val_components(unsigned char *circuit, double *R, double *L,double *C);
-void val_freq(float *fMin, float *fMax, int *num_freq); 
-void calc_module(unsigned char *circuit, int *num_freq, double *mod, double *R, double *L, double *C, const float *fMax, const float *fMin, double mod_tab[], double omegas_tab[]);
+void val_freq(double *fMin, double *fMax, int *num_freq); 
+void calc_module(unsigned char *circuit, int *num_freq, double *mod, double *R, double *L, double *C, const double *fMax, const double *fMin, double mod_tab[], double omegas_tab[]);
 void calc_phase(void); 
 void print(void);
 
@@ -27,20 +27,21 @@ void print(void);
 void list_circuits(unsigned char *circuit); 
 
 // Fonctions calcul de modules 
-void modRLS(double *R, double *L, int *num_freq, const float *fMax, const float *fMin, double omegas_tab[], double mod_tab[]);
-void modRLP(double *R, double *L, int *num_freq, const float *fMax, const float *fMin, double omegas_tab[], double mod_tab[]);
+void modRLS(double *R, double *L, int *num_freq, const double *fMax, const double *fMin, double omegas_tab[], double mod_tab[]);
+void modRLP(double *R, double *L, int *num_freq, const double *fMax, const double *fMin, double omegas_tab[], double mod_tab[]);
 
-void modRCS(double *R, double *C, double *mod);
-void modRCP(double *R, double *C, double *mod);
+void modRCS(double *R, double *C, int *num_freq, const double *fMax, const double *fMin, double omegas_tab[], double mod_tab[]);
+void modRCP(double *R, double *C, int *num_freq, const double *fMax, const double *fMin, double omegas_tab[], double mod_tab[]);
 
-void modLCS(double *L, double *C, double *mod);
-void modLCP(double *L, double *C, double *mod);
+void modLCS(double *L, double *C, int *num_freq, const double *fMax, const double *fMin, double omegas_tab[], double mod_tab[]);
+void modLCS(double *L, double *C, int *num_freq, const double *fMax, const double *fMin, double omegas_tab[], double mod_tab[]);
+
  
 int main(){
 
 	char circuit = 0; 
 	double R,C,L = 0; 
-	float fMin=0,fMax=0;
+	double fMin=0,fMax=0;
 	int num_freq=0; 
 	double mod = 0; 
 	double phase = 0; 
@@ -91,7 +92,7 @@ void val_components(unsigned char *circuit, double *R, double *L, double *C){
 	
 }
 
-void val_freq(float *fMin, float *fMax, int *num_freq){
+void val_freq(double *fMin, double *fMax, int *num_freq){
 
 	// Variable logique boolean pour le choix d'une plage de frequence ou une seule 
 	int plage_freq = 0; 
@@ -105,12 +106,12 @@ void val_freq(float *fMin, float *fMax, int *num_freq){
 
 	if (plage_freq){ 
 		printf("Indiquez votre frequence maximale souhaitee\n");
-		scanf("%f",fMax);
+		scanf("%lf",fMax);
 		printf("Indiquez votre frequence minimale souhaitee\n");
-		scanf("%f",fMin);
+		scanf("%lf",fMin);
 		printf("Nombre de frequences a calculer entre la frequence maximale et minimale\n");
 		scanf("%d",num_freq);
-		printf("Vous avez choisi une plage entre %.2f et %.2f et un pas de %d\n",*fMax,*fMin,*num_freq); 
+		printf("Vous avez choisi une plage entre %.2lf et %.2lf et un pas de %d\n",*fMax,*fMin,*num_freq); 
 	}else{ 
 	
 		printf("Indiquez la frequence souhaitee\n");
@@ -120,7 +121,7 @@ void val_freq(float *fMin, float *fMax, int *num_freq){
 	
 }
 
-void calc_module(unsigned char *circuit, int *num_freq, double *mod, double *R, double *L, double *C, const float *fMax, const float *fMin, double mod_tab[], double omegas_tab[]){
+void calc_module(unsigned char *circuit, int *num_freq, double *mod, double *R, double *L, double *C, const double *fMax, const double *fMin, double mod_tab[], double omegas_tab[]){
 
 	// Valeurs des impedances au carre X1
 	double R1 = (*R)*(*R);
@@ -143,6 +144,12 @@ void calc_module(unsigned char *circuit, int *num_freq, double *mod, double *R, 
 				break; 
 			case 2 : 
 				modRLP(R, L, num_freq, fMax, fMin, mod_tab, omegas_tab);
+				break;
+			case 3 : 
+				modRCS(R, C, num_freq, fMax, fMin, mod_tab, omegas_tab);
+				break; 
+			case 4: 
+				modRCP(R, C, num_freq, fMax, fMin, mod_tab, omegas_tab);
 				break;
 			default : 
 				printf("ERROR : Circuit parallel non identifie\n");	
@@ -233,27 +240,22 @@ void list_circuits(unsigned char *circuit){
 
 // Fonctions calcul de modules 
 
-void modRLS(double *R, double *L, int *num_freq, const float *fMax, const float *fMin, double omegas_tab[], double mod_tab[])
+void modRLS(double *R, double *L, int *num_freq, const double *fMax, const double *fMin, double omegas_tab[], double mod_tab[])
 {
-	
-	
-	double R1 = (*R)*(*R);
-	double L1 = (*L)*(*L);
 	
 	double omega0 = (2.0)*PI*(*fMin);
 	double omega1 = (2.0)*PI*(*fMax);
 
-	double pas_omega = fabs((omega1-omega0)/(*num_freq));
+	double pas_omega = (omega1 - omega0) / (*num_freq - 1); // delta entre la premiere f et la derniere
 	
-		
 	// Tableaux avec pulsations 
-	for (int i = 0; i < *num_freq ; i++){
-		*(omegas_tab + i) = pas_omega*(i+1);  
+	for (int i = 0; i < *num_freq; i++){
+		omegas_tab[i] = omega0 + (i * pas_omega); 
 	}
 	
 	// Tableaux avec modules
 	for (int i = 0; i< *num_freq; i++){
-		*(mod_tab + i) = sqrt( ((*R)*(*R)) + (omegas_tab[i]*((*L)*(*L))) );
+		*(mod_tab + i) = sqrt( ((*R)*(*R)) + ((omegas_tab[i]*omegas_tab[i])*((*L)*(*L))) );
 
 	}
 	
@@ -261,14 +263,14 @@ void modRLS(double *R, double *L, int *num_freq, const float *fMax, const float 
 	printf("Modules pour le RL series : \n");
 
 	for (int i = 0 ; i< *num_freq; i++){
-		printf("Freq : %.2lf et Module : %.2lf\n",(omegas_tab[i])/(2*(3.14)),mod_tab[i]);
+		printf("Freq : %.2lf et Module : %lf\n",(omegas_tab[i])/(2*(3.14)),mod_tab[i]);
 	}
 	
 	
 }
 
 
-void modRLP(double *R, double *L, int *num_freq, const float *fMax, const float *fMin, double omegas_tab[], double mod_tab[])
+void modRLP(double *R, double *L, int *num_freq, const double *fMax, const double *fMin, double omegas_tab[], double mod_tab[])
 {
 	double R1 = (*R)*(*R);
 	double L1 = (*L)*(*L);
@@ -276,38 +278,88 @@ void modRLP(double *R, double *L, int *num_freq, const float *fMax, const float 
 	double omega0 = (2.0)*PI*(*fMin);
 	double omega1 = (2.0)*PI*(*fMax);
 
-	double pas_omega = fabs((omega1-omega0)/(*num_freq));
+	double pas_omega = (omega1 - omega0) / (*num_freq - 1); // delta entre la premiere f et la derniere
 	
-		
 	// Tableaux avec pulsations 
-	for (int i = 0; i < *num_freq ; i++){
-		*(omegas_tab + i) = pas_omega*(i+1);  
+	for (int i = 0; i < *num_freq; i++){
+		omegas_tab[i] = omega0 + (i * pas_omega); 
 	}
 	
 	// Tableaux avec modules
 	for (int i = 0; i< *num_freq; i++){
-		*(mod_tab + i) = fabs(((*R)*(*L)*(omegas_tab[i])))/sqrt(L1+R1);
+		*(mod_tab + i) = fabs(((*R)*(*L)*(omegas_tab[i])))/sqrt(((*L)*(*L))*(omegas_tab[i]*omegas_tab[i])+R1);
 	}
 	
 	// Affichage modules
-	printf("Modules pour le RL series : \n");
+	printf("Modules pour le RL parallel : \n");
 
 	for (int i = 0 ; i< *num_freq; i++){
-		printf("Freq : %.2lf et Module : %.2lf\n",(omegas_tab[i])/(2*(3.14)),mod_tab[i]);
+		printf("Freq : %.2lf et Module : %lf\n",(omegas_tab[i])/(2*(3.14)),mod_tab[i]);
 	}
 }
 
-/*
-void modRCS(double *R, double *C, double *mod);
-void modRCP(double *R, double *C, double *mod){
 
+void modRCS(double *R, double *C, int *num_freq, const double *fMax, const double *fMin, double omegas_tab[], double mod_tab[]){
+	
+	double R1 = (*R)*(*R);
+	double C1 = (*C)*(*C);
+	
+	double omega0 = (2.0)*PI*(*fMin);
+	double omega1 = (2.0)*PI*(*fMax);
 
+	double pas_omega = (omega1 - omega0) / (*num_freq - 1); // delta entre la premiere f et la derniere
+	
+	// Tableaux avec pulsations 
+	for (int i = 0; i < *num_freq; i++){
+		omegas_tab[i] = omega0 + (i * pas_omega); 
+	}
+	
+	// Tableaux avec modules
+	for (int i = 0; i< *num_freq; i++){
+		C1 = 1/(C1*((omegas_tab[i]*omegas_tab[i])));
+		*(mod_tab + i) = sqrt(C1+R1);
+	}
+	
+	// Affichage modules
+	printf("Modules pour le RC series : \n");
 
-				*(mod_tab+i) = fabs((*R)/sqrt(1+((R1*C1*(omega_tab[i]*omega_tab[i]))));
+	for (int i = 0 ; i< *num_freq; i++){
+		printf("Freq : %.2lf et Module : %lf\n",(omegas_tab[i])/(2*(3.14)),mod_tab[i]);
+	}
+	
+	
+}
+void modRCP(double *R, double *C, int *num_freq, const double *fMax, const double *fMin, double omegas_tab[], double mod_tab[]){
+
+	double R1 = (*R)*(*R);
+	double C1 = (*C)*(*C);
+	
+	double omega0 = (2.0)*PI*(*fMin);
+	double omega1 = (2.0)*PI*(*fMax);
+
+	double pas_omega = (omega1 - omega0) / (*num_freq - 1); // delta entre la premiere f et la derniere
+	
+	// Tableaux avec pulsations 
+	for (int i = 0; i < *num_freq; i++){
+		omegas_tab[i] = omega0 + (i * pas_omega); 
+	}
+	
+	// Tableaux avec modules
+	for (int i = 0; i< *num_freq; i++){
+		//C1 = 1/(C1*((omegas_tab[i]*omegas_tab[i])));
+		mod_tab[i] = fabs((*R)/sqrt(1+((R1*C1*(omegas_tab[i]*omegas_tab[i])))));	
+	}
+	
+	// Affichage modules
+	printf("Modules pour le RC parallel : \n");
+
+	for (int i = 0 ; i< *num_freq; i++){
+		printf("Freq : %.2lf et Module : %lf\n",(omegas_tab[i])/(2*(3.14)),mod_tab[i]);
+	}
 
 
 };
-
+/*
 void modLCS(double *L, double *L, double *mod);
 void modLCP(double *L, double *L, double *mod);
 */
